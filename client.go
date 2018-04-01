@@ -1,6 +1,7 @@
 package gphoto
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,8 +12,10 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/sclevine/agouti"
 	"golang.org/x/net/publicsuffix"
 )
 
@@ -32,8 +35,14 @@ const (
 	// GooglePhotoDataQueryURL url do something
 	GooglePhotoDataQueryURL = "https://photos.google.com/_/PhotosUi/data"
 
+	// GoogleLoginSite the url to login
+	GoogleLoginSite = "https://accounts.google.com/ServiceLogin"
 	// DefaultAlbum a required album need to do a magic thing
 	DefaultAlbum = "DefaultAlbum"
+)
+
+var (
+	HomePageURL, _ = url.Parse(GooglePhotoURL)
 )
 
 // Client present a upload client
@@ -42,6 +51,7 @@ type Client struct {
 	magicToken string
 }
 
+// NewClient init a Client by existing cookies.
 func NewClient(cookies ...*http.Cookie) *Client {
 	jar, _ := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 
@@ -72,25 +82,68 @@ func (c *Client) SetCookies(cookies ...*http.Cookie) *Client {
 		}
 	}
 
-	cookieURL, _ := url.Parse(GooglePhotoURL)
-	c.hClient.Jar.SetCookies(cookieURL, cookies)
+	c.hClient.Jar.SetCookies(HomePageURL, cookies)
 	return c
 }
 
-func (c *Client) ExportCookies(filepath string) {
-	file, err := os.Open(filepath)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	cookieURL, _ := url.Parse(GooglePhotoURL)
-	json.NewDecoder(file).Decode(c.hClient.Jar.Cookies(cookieURL))
+func (c *Client) ExportCookies() string {
+	var buf bytes.Buffer
+	json.NewDecoder(&buf).Decode(c.hClient.Jar.Cookies(HomePageURL))
+	return buf.String()
 }
 
 // SetHTTPClient specific the http client to the upload client.
 func (c *Client) SetHTTPClient(hClient *http.Client) *Client {
 	c.hClient = hClient
 	return c
+}
+
+func (c *Client) Login(user, pass string) error {
+	log.Println("Request to login")
+
+	drive := agouti.ChromeDriver()
+	if err := drive.Start(); err != nil {
+		return err
+	}
+
+	defer drive.Stop()
+
+	page, err := drive.NewPage(agouti.Browser("firefox"))
+	if err != nil {
+		return err
+	}
+	defer page.CloseWindow()
+
+	if err := page.Navigate(GoogleLoginSite); err != nil {
+		return err
+	}
+
+	page.Find("form").FirstByName("identifier").Fill(user)
+	if err := page.FindByID("identifierNext").Click(); err != nil {
+		return err
+	}
+
+	time.Sleep(1 * time.Second)
+
+	if err := page.Find("form").FindByName("password").Fill(pass); err != nil {
+		return err
+	}
+	if err := page.FindByID("passwordNext").Click(); err != nil {
+		return err
+	}
+
+	time.Sleep(1 * time.Second)
+
+	page.Navigate(GooglePhotoURL)
+	cookies, _ := page.GetCookies()
+	c.hClient.Jar.SetCookies(HomePageURL, cookies)
+
+	if err := c.parseAtToken(); err != nil {
+		return errors.New("Login failure. Can not get the magic token")
+	}
+
+	log.Println("Login successful")
+	return nil
 }
 
 // Upload uploads the file to the google photo.
@@ -106,12 +159,9 @@ func (c *Client) Upload(filePath string) (string, string, error) {
 	fileInfo, _ := file.Stat()
 
 	// A magic token need to be genarate firstly.
-	atToken, err := c.getAtToken()
-	if err != nil {
+	if err := c.parseAtToken(); err != nil {
 		return "", "", err
 	}
-
-	c.magicToken = atToken
 
 	// Start create a new upload session
 	uploadURL, err := c.createUploadURL(fileInfo.Name(), fileInfo.Size())
@@ -138,17 +188,17 @@ func (c *Client) Upload(filePath string) (string, string, error) {
 
 }
 
-//getAtToken get the at token ( a magic token )
-func (c *Client) getAtToken() (string, error) {
+//parseAtToken get the at token ( a magic token ) then set it as the magicToken
+func (c *Client) parseAtToken() error {
 	log.Println("Request to get the magic token")
 
 	res, err := c.hClient.Get(GooglePhotoURL)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	if res.StatusCode > 299 {
-		return "", errors.New(res.Status)
+		return errors.New(res.Status)
 	}
 
 	doc, _ := goquery.NewDocumentFromReader(res.Body)
@@ -166,10 +216,11 @@ func (c *Client) getAtToken() (string, error) {
 	})
 
 	if magicToken.Token == "" {
-		return "", errors.New("Failed to get the magic token")
+		return errors.New("Failed to get the magic token")
 	}
 
-	return magicToken.Token, nil
+	c.magicToken = magicToken.Token
+	return nil
 }
 
 //createUploadURL create an new upload url

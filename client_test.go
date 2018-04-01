@@ -52,7 +52,6 @@ func TestUpload(t *testing.T) {
 	defer os.Remove(sampleFile)
 
 	client := NewClient(GetTestCookies()...)
-	defer client.ExportCookies(CookieJsonFile)
 
 	photoID, photoURL, err := client.Upload(sampleFile)
 	if err != nil {
@@ -68,10 +67,24 @@ func BenchmarkReUpload(b *testing.B) {
 		defer os.Remove(sampleFile)
 
 		client := NewClient(GetTestCookies()...)
-		defer client.ExportCookies(CookieJsonFile)
 
 		if _, _, err := client.Upload(sampleFile); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+func TestLogin(t *testing.T) {
+
+	user := os.Getenv("GOOGLE_USERNAME")
+	pass := os.Getenv("GOOGLE_PASSWORD")
+
+	if len(user) == 0 || len(pass) == 0 {
+		t.Fatal("User or passowrd is empty")
+	}
+
+	c := NewClient()
+	if err := c.Login(user, pass); err != nil {
+		t.Fatal(err)
 	}
 }

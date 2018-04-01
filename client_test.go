@@ -61,3 +61,17 @@ func TestUpload(t *testing.T) {
 
 	t.Log(photoID, photoURL)
 }
+
+func BenchmarkReUpload(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		sampleFile := GenNewSampleFile("./sample_data/sample.mp4")
+		defer os.Remove(sampleFile)
+
+		client := NewClient(GetTestCookies()...)
+		defer client.ExportCookies(CookieJsonFile)
+
+		if _, _, err := client.Upload(sampleFile); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

@@ -7,6 +7,26 @@ import (
 	"strings"
 )
 
+const (
+	QueryNumberEnableImage           = 137530650
+	QueryNumberGetAlbum              = 72930366
+	QueryNumberCreateAlbum           = 79956622
+	QueryNumberAddPhotoToAlbum       = 79956622
+	QueryNumberAddPhotoToSharedAlbum = 99484733
+	QueryNumberRemovePhotoFromAlbum  = 85381832
+)
+
+type Photo struct {
+	ID string
+}
+
+type Album struct {
+	ID   string
+	Name string
+}
+
+type Albums []*Album
+
 type MagicToken struct {
 	Token string `json:"SNlM0e"`
 }
@@ -98,20 +118,12 @@ func NewSessionUploadFromJson(body string) *SessionUpload {
 	return &sessionUpload
 }
 
-type InnerItemFirstItemEnableImageRequest interface{}
-type FirstItemEnableImageRequest []InnerItemFirstItemEnableImageRequest
-type EnableImageRequest []interface{}
-type SecondInnerArray []MapOfItemsToEnable
-type InnerItemToEnableArray interface{}
-type ItemToEnableArray []InnerItemToEnableArray
-type ItemToEnable []ItemToEnableArray
-type MapOfItemsToEnable map[string]ItemToEnable
 type EnableImageResponse []interface{}
 
 func (r EnableImageResponse) getEnabledImageId() string {
 	innerArray := r[0].([]interface{})
 	innerObject := innerArray[1].(map[string]interface{})
-	secondInnerArray := innerObject[fmt.Sprintf("%v", EnablePhotoKey)].([]interface{})
+	secondInnerArray := innerObject[fmt.Sprintf("%v", QueryNumberEnableImage)].([]interface{})
 	thirdInnerArray := secondInnerArray[0].([]interface{})
 	fourthInnerArray := thirdInnerArray[0].([]interface{})
 	fifthInnerObject := fourthInnerArray[1].([]interface{})
@@ -123,7 +135,7 @@ func (eir EnableImageResponse) getEnabledImageURL() (string, error) {
 	if len(eir) > 0 {
 		if inner1Array, ok := eir[0].([]interface{}); ok && len(inner1Array) >= 2 {
 			if inner2Map, ok := inner1Array[1].(map[string]interface{}); ok {
-				inner3Array = inner2Map[strconv.Itoa(EnablePhotoKey)].([]interface{})
+				inner3Array = inner2Map[strconv.Itoa(QueryNumberEnableImage)].([]interface{})
 			}
 		}
 	}
@@ -141,4 +153,52 @@ func (eir EnableImageResponse) getEnabledImageURL() (string, error) {
 		}
 	}
 	return "", fmt.Errorf("no enabledImageURL")
+}
+
+func NewDataQuery(queryNumber int, query interface{}) string {
+	d, _ := json.Marshal(
+		[]interface{}{
+			[]interface{}{
+				[]interface{}{
+					queryNumber,
+					[]interface{}{
+						map[string]interface{}{
+							fmt.Sprintf("%v", queryNumber): query,
+						},
+					},
+					nil,
+					nil,
+					0,
+				},
+			},
+		},
+	)
+	return fmt.Sprintf("%s", d)
+}
+
+func NewMutateQuery(queryNumber int, query interface{}) string {
+	d, _ := json.Marshal([]interface{}{
+		"af.maf",
+		[]interface{}{
+			[]interface{}{
+				"af.add",
+				queryNumber,
+				[]interface{}{
+					map[string]interface{}{
+						fmt.Sprintf("%v", queryNumber): query,
+					},
+				},
+			},
+		}})
+	return fmt.Sprintf("%s", d)
+}
+
+func (albums Albums) Get(name string) *Album {
+	for _, album := range albums {
+		if name == album.Name {
+			return album
+		}
+	}
+
+	return nil
 }

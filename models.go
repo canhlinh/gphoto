@@ -14,10 +14,14 @@ const (
 	QueryNumberAddPhotoToAlbum       = 79956622
 	QueryNumberAddPhotoToSharedAlbum = 99484733
 	QueryNumberRemovePhotoFromAlbum  = 85381832
+	QueryStringAddPhotoToAlbum       = "C2V01c"
 )
 
 type Photo struct {
-	ID string
+	ID      string
+	AlbumID string
+	Name    string
+	URL     string
 }
 
 type Album struct {
@@ -26,6 +30,16 @@ type Album struct {
 }
 
 type Albums []*Album
+
+func (albums Albums) Get(name string) *Album {
+	for _, album := range albums {
+		if name == album.Name {
+			return album
+		}
+	}
+
+	return nil
+}
 
 type MagicToken struct {
 	Token string `json:"SNlM0e"`
@@ -191,14 +205,4 @@ func NewMutateQuery(queryNumber int, query interface{}) string {
 			},
 		}})
 	return fmt.Sprintf("%s", d)
-}
-
-func (albums Albums) Get(name string) *Album {
-	for _, album := range albums {
-		if name == album.Name {
-			return album
-		}
-	}
-
-	return nil
 }

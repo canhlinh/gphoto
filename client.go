@@ -35,6 +35,9 @@ const (
 	// GooglePhotoDataQueryURL url do something
 	GooglePhotoDataQueryURL = "https://photos.google.com/_/PhotosUi/data"
 
+	// GoogleCommandDataURL
+	GoogleCommandDataURL = "https://photos.google.com/_/PhotosUi/data/batchexecute?f.sid=0&hl=en&soc-app=165&soc-platform=1&soc-device=1&_reqid=0&rt=c"
+
 	// GoogleLoginSite the url to login
 	GoogleLoginSite = "https://accounts.google.com/ServiceLogin"
 	// DefaultAlbum a required album need to do a magic thing
@@ -148,44 +151,46 @@ func (c *Client) Login(user, pass string) error {
 
 // Upload uploads the file to the google photo.
 // We will recive an url that people can access to the uploaded file directly.
-func (c *Client) Upload(filePath string) (string, string, error) {
+func (c *Client) Upload(filePath string) (*Photo, error) {
 	log.Println("Start upload file ", filePath)
 
 	file, err := os.Open(filePath)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 	defer file.Close()
 	fileInfo, _ := file.Stat()
 
 	// A magic token need to be genarate firstly.
 	if err := c.parseAtToken(); err != nil {
-		return "", "", err
+		return nil, err
 	}
 
 	// Start create a new upload session
 	uploadURL, err := c.createUploadURL(fileInfo.Name(), fileInfo.Size())
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
 	// start upload file
 	uploadToken, err := c.upload(uploadURL, file, fileInfo.Size())
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
 	photoID, photoURL, err := c.enableUploadedFile(uploadToken, fileInfo.Name(), fileInfo.ModTime().Unix()*1000)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
-	if err := c.moveToAlbum(DefaultAlbum, photoID); err != nil {
-		return "", "", err
+	photo, err := c.moveToAlbum(DefaultAlbum, photoID)
+	if err != nil {
+		return nil, err
 	}
 
-	return photoID, photoURL, err
-
+	photo.Name = fileInfo.Name()
+	photo.URL = photoURL
+	return photo, nil
 }
 
 //parseAtToken get the at token ( a magic token ) then set it as the magicToken
@@ -416,50 +421,44 @@ func (c *Client) CreateAlbum(albumName string, photoID string) (*Album, error) {
 	return &album, nil
 }
 
-func (client *Client) AddPhotoToAlbum(albumID, photoID string) error {
-	log.Printf("Request to add photo %s to album %s", photoID, albumID)
-
-	query := NewMutateQuery(QueryNumberAddPhotoToAlbum,
-		[]interface{}{
-			[]string{photoID},
-			albumID,
-		},
-	)
-
-	body, err := client.DoQuery(GooglePhotoMutateQueryURL, query)
-	if err != nil {
-		return err
+func (client *Client) GetSharedAlbumKey(albumID string) string {
+	res, _ := client.hClient.Get(fmt.Sprintf("https://photos.google.com/u/0/album/%s", albumID))
+	if res.StatusCode != 200 {
+		return ""
 	}
-	body.Close()
 
-	return nil
+	doc, _ := goquery.NewDocumentFromReader(res.Body)
+
+	var sharedKey string
+	doc.Find("meta").Each(func(i int, s *goquery.Selection) {
+		v, _ := s.Attr("http-equiv")
+		c, _ := s.Attr("content")
+		if v == "refresh" && len(strings.Split(c, ";")) == 2 {
+			redirectURL, _ := url.Parse(strings.Split(c, ";")[1])
+			sharedKey = redirectURL.Query().Get("key")
+		}
+	})
+
+	return sharedKey
 }
 
-func (client *Client) AddPhotoToSharedAlbum(albumID, photoID string) error {
-	log.Printf("Request to add photo %s to shared album %s", photoID, albumID)
+func (c *Client) AddPhotoToAlbum(albumID, photoID string) error {
+	log.Printf("Request to add photo %s to album %s", photoID, albumID)
+	sharedAlbumKey := c.GetSharedAlbumKey(albumID)
 
-	query := NewMutateQuery(QueryNumberAddPhotoToSharedAlbum,
-		[]interface{}{
-			[]string{albumID},
-			[]interface{}{
-				2,
-				nil,
-				[]interface{}{
-					[][]string{[]string{photoID}},
-				},
-				nil,
-				nil,
-				[]interface{}{},
-				[]interface{}{},
-			},
-		},
-	)
+	var query string
 
-	body, err := client.DoQuery(GooglePhotoMutateQueryURL, query)
+	if len(sharedAlbumKey) == 0 {
+		query = fmt.Sprintf(`[[["E1Cajb","[[\"%s\"],\"%s\"]",null,"generic"]]]`, photoID, albumID)
+	} else {
+		query = fmt.Sprintf(`[[["C2V01c","[[\"%s\"],[2,null,[[[\"%s\"]]],null,null,[],[1],null,null,null,[]],\"%s\",[null,null,null,null,[null,[]]]]",null,"generic"]]]`, albumID, photoID, sharedAlbumKey)
+	}
+
+	body, err := c.DoQuery(GoogleCommandDataURL, query)
 	if err != nil {
 		return err
 	}
-	body.Close()
+	defer body.Close()
 
 	return nil
 }
@@ -483,25 +482,34 @@ func (c *Client) RemoveFromAlbum(photoID string) error {
 	return nil
 }
 
-func (c *Client) moveToAlbum(name string, photoID string) error {
+func (c *Client) moveToAlbum(name string, photoID string) (*Photo, error) {
 	log.Println("Request to move the upload file to the Default Album")
 
 	albums, err := c.GetAlbums()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	album := albums.Get(name)
 	if album == nil {
 		if _, err := c.CreateAlbum(name, photoID); err != nil {
-			return err
+			return nil, err
 		}
-		return nil
+		return nil, nil
 	}
 
 	if err := c.AddPhotoToAlbum(album.ID, photoID); err != nil {
-		return c.AddPhotoToSharedAlbum(album.ID, photoID)
+		return nil, err
 	}
 
-	return nil
+	photo := &Photo{
+		ID:      photoID,
+		AlbumID: album.ID,
+	}
+
+	return photo, nil
+}
+
+func (c *Client) getPhotoURL(photoID string) (string, error) {
+	return "", nil
 }

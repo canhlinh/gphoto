@@ -53,12 +53,12 @@ func TestUpload(t *testing.T) {
 
 	client := NewClient(GetTestCookies()...)
 
-	photoID, photoURL, err := client.Upload(sampleFile)
+	photo, err := client.Upload(sampleFile)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	t.Log(photoID, photoURL)
+	t.Log(photo.ID, photo.URL, photo.Name, photo.AlbumID)
 }
 
 func BenchmarkReUpload(b *testing.B) {
@@ -68,7 +68,7 @@ func BenchmarkReUpload(b *testing.B) {
 
 		client := NewClient(GetTestCookies()...)
 
-		if _, _, err := client.Upload(sampleFile); err != nil {
+		if _, err := client.Upload(sampleFile); err != nil {
 			b.Fatal(err)
 		}
 	}

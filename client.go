@@ -491,23 +491,19 @@ func (c *Client) moveToAlbum(name string, photoID string) (*Photo, error) {
 	}
 
 	album := albums.Get(name)
+	photo := Photo{ID: photoID}
+
 	if album == nil {
-		if _, err := c.CreateAlbum(name, photoID); err != nil {
+		album, err = c.CreateAlbum(name, photoID)
+		if err != nil {
 			return nil, err
 		}
-		return nil, nil
-	}
-
-	if err := c.AddPhotoToAlbum(album.ID, photoID); err != nil {
+	} else if err := c.AddPhotoToAlbum(album.ID, photoID); err != nil {
 		return nil, err
 	}
 
-	photo := &Photo{
-		ID:      photoID,
-		AlbumID: album.ID,
-	}
-
-	return photo, nil
+	photo.AlbumID = album.ID
+	return &photo, nil
 }
 
 func (c *Client) getPhotoURL(photoID string) (string, error) {

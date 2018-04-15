@@ -52,6 +52,7 @@ var (
 type Client struct {
 	hClient    *http.Client
 	magicToken string
+	uploader   *Uploader
 }
 
 // NewClient init a Client by existing cookies.
@@ -63,7 +64,8 @@ func NewClient(cookies ...*http.Cookie) *Client {
 	}
 
 	c := &Client{
-		hClient: hClient,
+		hClient:  hClient,
+		uploader: NewUploader(hClient),
 	}
 
 	return c.SetCookies(cookies...)
@@ -151,7 +153,7 @@ func (c *Client) Login(user, pass string) error {
 
 // Upload uploads the file to the google photo.
 // We will recive an url that people can access to the uploaded file directly.
-func (c *Client) Upload(filePath string) (*Photo, error) {
+func (c *Client) Upload(filePath string, progressHandler ProgressHandler) (*Photo, error) {
 	log.Println("Start upload file ", filePath)
 
 	file, err := os.Open(filePath)
@@ -173,7 +175,7 @@ func (c *Client) Upload(filePath string) (*Photo, error) {
 	}
 
 	// start upload file
-	uploadToken, err := c.upload(uploadURL, file, fileInfo.Size())
+	uploadToken, err := c.upload(uploadURL, file, fileInfo.Size(), progressHandler)
 	if err != nil {
 		return nil, err
 	}
@@ -257,14 +259,10 @@ func (c *Client) createUploadURL(fileName string, fileSize int64) (string, error
 }
 
 // upload uploads file to server then you will get a upload token
-func (c *Client) upload(uploadURL string, file io.ReadCloser, fileSize int64) (string, error) {
+func (c *Client) upload(uploadURL string, file io.ReadCloser, fileSize int64, progressHandler ProgressHandler) (string, error) {
 	log.Println("Request to upload file data")
 
-	req, _ := http.NewRequest(http.MethodPost, uploadURL, file)
-	req.Header.Add("content-type", "application/octet-stream")
-	req.Header.Add("user-agent", ChromeUserAgent)
-
-	resp, err := c.hClient.Do(req)
+	resp, err := c.uploader.Do(uploadURL, file, fileSize, progressHandler)
 	if err != nil {
 		return "", err
 	}

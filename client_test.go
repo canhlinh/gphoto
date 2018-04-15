@@ -9,6 +9,8 @@ import (
 	"path"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -53,12 +55,41 @@ func TestUpload(t *testing.T) {
 
 	client := NewClient(GetTestCookies()...)
 
-	photo, err := client.Upload(sampleFile)
-	if err != nil {
-		t.Fatal(err)
-	}
+	t.Run("UploadSuccessWithoutProgressHandler", func(t *testing.T) {
+		photo, err := client.Upload(sampleFile, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	t.Log(photo.ID, photo.URL, photo.Name, photo.AlbumID)
+		assert.NotEmpty(t, photo.ID)
+		assert.NotEmpty(t, photo.AlbumID)
+		assert.NotEmpty(t, photo.URL)
+		assert.NotEmpty(t, photo.Name)
+	})
+
+	t.Run("UploadSuccessWithProgressHandler", func(t *testing.T) {
+
+		var current int64
+		var total int64
+		progressHandler := func(c int64, t int64) {
+			//fmt.Printf("current %d , total %d ", current, total)
+			// I'm lazy to write this test. But it's work
+			current = c
+			total = t
+		}
+
+		photo, err := client.Upload(sampleFile, progressHandler)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, current, total)
+		assert.NotEmpty(t, photo.ID)
+		assert.NotEmpty(t, photo.AlbumID)
+		assert.NotEmpty(t, photo.URL)
+		assert.NotEmpty(t, photo.Name)
+	})
+
 }
 
 func BenchmarkReUpload(b *testing.B) {
@@ -68,7 +99,7 @@ func BenchmarkReUpload(b *testing.B) {
 
 		client := NewClient(GetTestCookies()...)
 
-		if _, err := client.Upload(sampleFile); err != nil {
+		if _, err := client.Upload(sampleFile, nil); err != nil {
 			b.Fatal(err)
 		}
 	}

@@ -153,7 +153,7 @@ func (c *Client) Login(user, pass string) error {
 
 // Upload uploads the file to the google photo.
 // We will recive an url that people can access to the uploaded file directly.
-func (c *Client) Upload(filePath string, progressHandler ProgressHandler) (*Photo, error) {
+func (c *Client) Upload(filePath string, filename string, progressHandler ProgressHandler) (*Photo, error) {
 	log.Println("Start upload file ", filePath)
 
 	file, err := os.Open(filePath)
@@ -168,8 +168,12 @@ func (c *Client) Upload(filePath string, progressHandler ProgressHandler) (*Phot
 		return nil, err
 	}
 
+	if filename == "" {
+		filename = fileInfo.Name()
+	}
+
 	// Start create a new upload session
-	uploadURL, err := c.createUploadURL(fileInfo.Name(), fileInfo.Size())
+	uploadURL, err := c.createUploadURL(filename, fileInfo.Size())
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +184,7 @@ func (c *Client) Upload(filePath string, progressHandler ProgressHandler) (*Phot
 		return nil, err
 	}
 
-	photoID, photoURL, err := c.enableUploadedFile(uploadToken, fileInfo.Name(), fileInfo.ModTime().Unix()*1000)
+	photoID, photoURL, err := c.enableUploadedFile(uploadToken, filename, fileInfo.ModTime().Unix()*1000)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +194,7 @@ func (c *Client) Upload(filePath string, progressHandler ProgressHandler) (*Phot
 		return nil, err
 	}
 
-	photo.Name = fileInfo.Name()
+	photo.Name = filename
 	photo.URL = photoURL
 	return photo, nil
 }

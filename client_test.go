@@ -56,7 +56,19 @@ func TestUpload(t *testing.T) {
 	client := NewClient(GetTestCookies()...)
 
 	t.Run("UploadSuccessWithoutProgressHandler", func(t *testing.T) {
-		photo, err := client.Upload(sampleFile, nil)
+		photo, err := client.Upload(sampleFile, "sample.mp4", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.NotEmpty(t, photo.ID)
+		assert.NotEmpty(t, photo.AlbumID)
+		assert.NotEmpty(t, photo.URL)
+		assert.Equal(t, photo.Name, "sample.mp4")
+	})
+
+	t.Run("UploadSuccessWithoutProgressHandlerAndFileName", func(t *testing.T) {
+		photo, err := client.Upload(sampleFile, "", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -65,6 +77,7 @@ func TestUpload(t *testing.T) {
 		assert.NotEmpty(t, photo.AlbumID)
 		assert.NotEmpty(t, photo.URL)
 		assert.NotEmpty(t, photo.Name)
+		assert.Equal(t, path.Base(sampleFile), photo.Name)
 	})
 
 	t.Run("UploadSuccessWithProgressHandler", func(t *testing.T) {
@@ -78,7 +91,7 @@ func TestUpload(t *testing.T) {
 			total = t
 		}
 
-		photo, err := client.Upload(sampleFile, progressHandler)
+		photo, err := client.Upload(sampleFile, "", progressHandler)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -99,7 +112,7 @@ func BenchmarkReUpload(b *testing.B) {
 
 		client := NewClient(GetTestCookies()...)
 
-		if _, err := client.Upload(sampleFile, nil); err != nil {
+		if _, err := client.Upload(sampleFile, "", nil); err != nil {
 			b.Fatal(err)
 		}
 	}

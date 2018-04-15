@@ -1,7 +1,11 @@
 # gphoto
 A small lib to upload files to the google photo
 
-# How to use
+#### Features
+- Uploads file to google photo account via user's cookies, via user's credential (user, pass).
+- Update upload's progress while a file is uploading.
+
+#### How to use
 
 If you want to login to google automaticaly, you have to install ChromeDriver first.
 See more about ChromeDrive at https://sites.google.com/a/chromium.org/chromedriver/

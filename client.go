@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	log "github.com/canhlinh/log4go"
 	"github.com/sclevine/agouti"
 	"golang.org/x/net/publicsuffix"
 )
@@ -104,7 +104,7 @@ func (c *Client) SetHTTPClient(hClient *http.Client) *Client {
 }
 
 func (c *Client) Login(user, pass string) error {
-	log.Println("Request to login")
+	log.Info("Request to login")
 
 	drive := agouti.ChromeDriver()
 	if err := drive.Start(); err != nil {
@@ -147,14 +147,14 @@ func (c *Client) Login(user, pass string) error {
 		return errors.New("Login failure. Can not get the magic token")
 	}
 
-	log.Println("Login successful")
+	log.Info("Login successful")
 	return nil
 }
 
 // Upload uploads the file to the google photo.
 // We will recive an url that people can access to the uploaded file directly.
 func (c *Client) Upload(filePath string, filename string, progressHandler ProgressHandler) (*Photo, error) {
-	log.Println("Start upload file ", filePath)
+	log.Info("Start upload file %s", filePath)
 
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -201,7 +201,7 @@ func (c *Client) Upload(filePath string, filename string, progressHandler Progre
 
 //parseAtToken get the at token ( a magic token ) then set it as the magicToken
 func (c *Client) parseAtToken() error {
-	log.Println("Request to get the magic token")
+	log.Info("Request to get the magic token")
 
 	res, err := c.hClient.Get(GooglePhotoURL)
 	if err != nil {
@@ -236,7 +236,7 @@ func (c *Client) parseAtToken() error {
 
 //createUploadURL create an new upload url
 func (c *Client) createUploadURL(fileName string, fileSize int64) (string, error) {
-	log.Println("Request to create a new upload url")
+	log.Info("Request to create a new upload url")
 
 	body := NewJSONBody(NewUploadSessionRequest(fileName, fileSize))
 
@@ -264,7 +264,7 @@ func (c *Client) createUploadURL(fileName string, fileSize int64) (string, error
 
 // upload uploads file to server then you will get a upload token
 func (c *Client) upload(uploadURL string, file io.ReadCloser, fileSize int64, progressHandler ProgressHandler) (string, error) {
-	log.Println("Request to upload file data")
+	log.Info("Request to upload file data")
 
 	resp, err := c.uploader.Do(uploadURL, file, fileSize, progressHandler)
 	if err != nil {
@@ -278,14 +278,14 @@ func (c *Client) upload(uploadURL string, file io.ReadCloser, fileSize int64, pr
 	stringBody := BodyToString(resp.Body)
 	uploadToken := NewSessionUploadFromJson(stringBody).SessionStatus.AdditionalInfo.GoogleRupioAdditionalInfo.CompletionInfo.CustomerSpecificInfo.UploadToken
 	if uploadToken == "" {
-		log.Println(stringBody)
+		log.Info(stringBody)
 		return "", fmt.Errorf("Failed to get upload token")
 	}
 	return uploadToken, nil
 }
 
 func (c *Client) enableUploadedFile(uploadBase64Token, fileName string, fileModAt int64) (string, string, error) {
-	log.Println("Request to enable the uploaded photo")
+	log.Info("Request to enable the uploaded photo")
 
 	query := NewMutateQuery(QueryNumberEnableImage,
 		[]interface{}{
@@ -341,7 +341,7 @@ func (client *Client) DoQuery(endpoint string, query string) (io.ReadCloser, err
 }
 
 func (client *Client) GetAlbums() (Albums, error) {
-	log.Println("Request to get albums")
+	log.Info("Request to get albums")
 
 	body, err := client.DoQuery(GooglePhotoDataQueryURL, NewDataQuery(QueryNumberGetAlbum, []interface{}{nil, nil, nil, nil, 1}))
 	if err != nil {
@@ -395,7 +395,7 @@ func (c *Client) SearchOrCreteaAlbum(name string, photoID string) (*Album, error
 }
 
 func (c *Client) CreateAlbum(albumName string, photoID string) (*Album, error) {
-	log.Printf("Request to create new album %v with photo's id %s \n", albumName, photoID)
+	log.Info("Request to create new album %v with photo's id %s \n", albumName, photoID)
 
 	query := NewMutateQuery(QueryNumberCreateAlbum, []interface{}{
 		[]string{photoID},
@@ -445,7 +445,7 @@ func (client *Client) GetSharedAlbumKey(albumID string) string {
 }
 
 func (c *Client) AddPhotoToAlbum(albumID, photoID string) error {
-	log.Printf("Request to add photo %s to album %s", photoID, albumID)
+	log.Info("Request to add photo %s to album %s", photoID, albumID)
 	sharedAlbumKey := c.GetSharedAlbumKey(albumID)
 
 	var query string
@@ -466,7 +466,7 @@ func (c *Client) AddPhotoToAlbum(albumID, photoID string) error {
 }
 
 func (c *Client) RemoveFromAlbum(photoID string) error {
-	log.Printf("Request to remove photo %s from the relevant album", photoID)
+	log.Info("Request to remove photo %s from the relevant album", photoID)
 
 	query := NewMutateQuery(
 		QueryNumberRemovePhotoFromAlbum,
@@ -485,7 +485,7 @@ func (c *Client) RemoveFromAlbum(photoID string) error {
 }
 
 func (c *Client) moveToAlbum(name string, photoID string) (*Photo, error) {
-	log.Println("Request to move the upload file to the Default Album")
+	log.Info("Request to move the upload file to the Default Album")
 
 	albums, err := c.GetAlbums()
 	if err != nil {

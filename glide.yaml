@@ -1,0 +1,12 @@
+package: github.com/canhlinh/gphoto
+import:
+- package: github.com/PuerkitoBio/goquery
+- package: github.com/canhlinh/log4go
+- package: github.com/sclevine/agouti
+- package: golang.org/x/net
+  subpackages:
+  - publicsuffix
+testImport:
+- package: github.com/stretchr/testify
+  subpackages:
+  - assert

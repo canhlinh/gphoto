@@ -153,7 +153,7 @@ func (c *Client) Login(user, pass string) error {
 
 // Upload uploads the file to the google photo.
 // We will recive an url that people can access to the uploaded file directly.
-func (c *Client) Upload(filePath string, filename string, progressHandler ProgressHandler) (*Photo, error) {
+func (c *Client) Upload(filePath string, filename string, album string, progressHandler ProgressHandler) (*Photo, error) {
 	log.Info("Start upload file %s", filePath)
 
 	file, err := os.Open(filePath)
@@ -189,7 +189,11 @@ func (c *Client) Upload(filePath string, filename string, progressHandler Progre
 		return nil, err
 	}
 
-	photo, err := c.moveToAlbum(DefaultAlbum, photoID)
+	if album == "" {
+		album = DefaultAlbum
+	}
+
+	photo, err := c.moveToAlbum(album, photoID)
 	if err != nil {
 		return nil, err
 	}

@@ -81,7 +81,6 @@ func TestUpload(t *testing.T) {
 	})
 
 	t.Run("UploadSuccessWithProgressHandler", func(t *testing.T) {
-
 		var current int64
 		var total int64
 		progressHandler := func(c int64, t int64) {
@@ -119,6 +118,7 @@ func BenchmarkReUpload(b *testing.B) {
 }
 
 func TestLogin(t *testing.T) {
+	t.Skip()
 
 	user := os.Getenv("GOOGLE_USERNAME")
 	pass := os.Getenv("GOOGLE_PASSWORD")

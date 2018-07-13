@@ -36,7 +36,7 @@ const (
 	GooglePhotoDataQueryURL = "https://photos.google.com/_/PhotosUi/data"
 
 	// GoogleCommandDataURL
-	GoogleCommandDataURL = "https://photos.google.com/_/PhotosUi/data/batchexecute?f.sid=0&hl=en&soc-app=165&soc-platform=1&soc-device=1&_reqid=0&rt=c"
+	GoogleCommandDataURL = "https://photos.google.com/_/PhotosUi/data/batchexecute?f.sid=0&bl=boq_photosuiserver_20180711.03_p0&hl=en&soc-app=165&soc-platform=1&soc-device=1&_reqid=785335&rt=c"
 
 	// GoogleLoginSite the url to login
 	GoogleLoginSite = "https://accounts.google.com/ServiceLogin"
@@ -184,7 +184,7 @@ func (c *Client) Upload(filePath string, filename string, album string, progress
 		return nil, err
 	}
 
-	photoID, photoURL, err := c.enableUploadedFile(uploadToken, filename, fileInfo.ModTime().Unix()*1000)
+	photoID, photoURL, err := c.enableUploadedFile(uploadToken, filename, fileInfo.ModTime().UnixNano()/1000000)
 	if err != nil {
 		return nil, err
 	}
@@ -289,40 +289,34 @@ func (c *Client) upload(uploadURL string, file io.ReadCloser, fileSize int64, pr
 }
 
 func (c *Client) enableUploadedFile(uploadBase64Token, fileName string, fileModAt int64) (string, string, error) {
-	log.Info("Request to enable the uploaded photo")
-
-	query := NewMutateQuery(QueryNumberEnableImage,
-		[]interface{}{
-			[]interface{}{
-				[]interface{}{
-					uploadBase64Token,
-					fileName,
-					fileModAt,
-				},
-			},
-		},
-	)
-
-	body, err := c.DoQuery(GooglePhotoMutateQueryURL, query)
+	log.Info("Request to enable the uploaded photo %d", fileModAt)
+	query := fmt.Sprintf(`[[["mdpdU","[[[\"%s\",\"%s\",%d]]]",null,"generic"]]]`, uploadBase64Token, fileName, fileModAt)
+	body, err := c.DoQuery(GoogleCommandDataURL, query)
 	if err != nil {
+		log.Error(err)
 		return "", "", err
 	}
 
+	parsedBody := JsonBodyByScanLine(BodyToString(body))
 	var enableImage EnableImageResponse
-	if err := json.Unmarshal(BodyToBytes(body)[6:], &enableImage); err != nil {
-		return "", "", err
-	}
-
-	photoURL, err := enableImage.getEnabledImageURL()
+	photoURL, err := enableImage.getEnabledImageURL(parsedBody)
 	if err != nil {
+		log.Error(err)
+		return "", "", err
+	}
+	photoID, err := enableImage.getEnabledImageID(parsedBody)
+	if err != nil {
+		log.Error(err)
 		return "", "", err
 	}
 
-	return enableImage.getEnabledImageId(), photoURL, nil
+	return photoID, photoURL, nil
 }
 
 func (client *Client) DoQuery(endpoint string, query string) (io.ReadCloser, error) {
-
+	if err := client.parseAtToken(); err != nil {
+		return nil, err
+	}
 	form := url.Values{}
 	form.Add("at", client.magicToken)
 	form.Add("f.req", query)
@@ -330,14 +324,12 @@ func (client *Client) DoQuery(endpoint string, query string) (io.ReadCloser, err
 	req, _ := http.NewRequest("POST", endpoint, strings.NewReader(form.Encode()))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8")
 	req.Header.Add("User-Agent", ChromeUserAgent)
-
+	req.Header.Add("referer", "https://photos.google.com/")
 	res, err := client.hClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	if res.StatusCode > 299 {
-		// DumpRequest(req)
-		// DumpResponse(res)
 		return nil, errors.New(res.Status)
 	}
 

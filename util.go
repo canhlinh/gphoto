@@ -1,12 +1,15 @@
 package gphoto
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httputil"
+	"strings"
+	"time"
 )
 
 //NewJSONBody create a new json request body from an interface
@@ -36,10 +39,31 @@ func NewJSONString(model interface{}) string {
 
 func DumpRequest(request *http.Request) {
 	d, _ := httputil.DumpRequest(request, true)
-	fmt.Printf("%s\n", d)
+	fmt.Printf("Request: %s\n", d)
 }
 
 func DumpResponse(response *http.Response) {
 	d, _ := httputil.DumpResponse(response, true)
-	fmt.Printf("%s\n", d)
+	fmt.Printf("Response: %s\n", d)
+}
+
+func UnixMiliSeconds() int64 {
+	return time.Now().UnixNano() / 1000000
+}
+
+func SpritMagicToken(t string) []string {
+	return strings.Split(t, ":")
+}
+
+func JsonBodyByScanLine(s string) string {
+	scanner := bufio.NewScanner(strings.NewReader(s))
+	i := 0
+	var b string
+	for scanner.Scan() {
+		i++
+		if i >= 4 && i <= 7 {
+			b += scanner.Text()
+		}
+	}
+	return b
 }

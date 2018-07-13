@@ -3,7 +3,6 @@ package gphoto
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 )
 
@@ -134,39 +133,41 @@ func NewSessionUploadFromJson(body string) *SessionUpload {
 
 type EnableImageResponse []interface{}
 
-func (r EnableImageResponse) getEnabledImageId() string {
-	innerArray := r[0].([]interface{})
-	innerObject := innerArray[1].(map[string]interface{})
-	secondInnerArray := innerObject[fmt.Sprintf("%v", QueryNumberEnableImage)].([]interface{})
-	thirdInnerArray := secondInnerArray[0].([]interface{})
-	fourthInnerArray := thirdInnerArray[0].([]interface{})
-	fifthInnerObject := fourthInnerArray[1].([]interface{})
-	return fifthInnerObject[0].(string)
+// getInfoArray un-safe function
+func (r EnableImageResponse) getInfoArray(s string) []interface{} {
+	json.Unmarshal([]byte(s), &r)
+	b := r[0].([]interface{})
+	obj := b[2].(string)
+	json.Unmarshal([]byte(obj), &b)
+
+	b = b[0].([]interface{})
+	b = b[0].([]interface{})
+	b = b[1].([]interface{})
+	return b
 }
 
-func (eir EnableImageResponse) getEnabledImageURL() (string, error) {
-	var inner3Array, inner6Array []interface{}
-	if len(eir) > 0 {
-		if inner1Array, ok := eir[0].([]interface{}); ok && len(inner1Array) >= 2 {
-			if inner2Map, ok := inner1Array[1].(map[string]interface{}); ok {
-				inner3Array = inner2Map[strconv.Itoa(QueryNumberEnableImage)].([]interface{})
-			}
+// getEnabledImageID un-safe function
+func (r EnableImageResponse) getEnabledImageID(body string) (s string, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
 		}
-	}
-	if len(inner3Array) > 0 {
-		if inner4Array, ok := inner3Array[0].([]interface{}); ok && len(inner4Array) > 0 {
-			if inner5Array, ok := inner4Array[0].([]interface{}); ok && len(inner5Array) >= 2 {
-				inner6Array = inner5Array[1].([]interface{})
-			}
+	}()
+
+	infoArr := r.getInfoArray(body)
+	return infoArr[0].(string), nil
+}
+
+// getEnabledImageURL un-safe function
+func (r EnableImageResponse) getEnabledImageURL(body string) (s string, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
 		}
-	}
-	if len(inner6Array) >= 2 {
-		inner7Array := inner6Array[1].([]interface{})
-		if enabledImageURL, ok := inner7Array[0].(string); ok {
-			return enabledImageURL, nil
-		}
-	}
-	return "", fmt.Errorf("no enabledImageURL")
+	}()
+
+	infoArr := r.getInfoArray(body)
+	return infoArr[0].(string), err
 }
 
 func NewDataQuery(queryNumber int, query interface{}) string {

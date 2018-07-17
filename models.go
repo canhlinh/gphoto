@@ -167,7 +167,8 @@ func (r EnableImageResponse) getEnabledImageURL(body string) (s string, err erro
 	}()
 
 	infoArr := r.getInfoArray(body)
-	return infoArr[0].(string), err
+	infoURL := infoArr[1].([]interface{})
+	return infoURL[0].(string), err
 }
 
 func NewDataQuery(queryNumber int, query interface{}) string {

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strings"
 	"testing"
 	"time"
 
@@ -64,6 +65,8 @@ func TestUpload(t *testing.T) {
 		assert.NotEmpty(t, photo.ID)
 		assert.NotEmpty(t, photo.AlbumID)
 		assert.NotEmpty(t, photo.URL)
+		assert.True(t, strings.HasPrefix(photo.URL, "https://lh3.googleusercontent.com/"))
+		fmt.Println(photo.URL, photo.ID)
 		assert.Equal(t, photo.Name, "sample.mp4")
 	})
 

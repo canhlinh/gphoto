@@ -3,6 +3,7 @@ package gphoto
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 )
 
@@ -207,4 +208,52 @@ func NewMutateQuery(queryNumber int, query interface{}) string {
 			},
 		}})
 	return fmt.Sprintf("%s", d)
+}
+
+type AlbumlResponse struct {
+	s string
+}
+
+func NewAlbumlResponse(s string) *AlbumlResponse {
+	return &AlbumlResponse{s}
+}
+
+func (al *AlbumlResponse) Albums() (albums []*Album, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
+		}
+	}()
+
+	mainArray := al.getMainArray()
+	for _, arr := range mainArray {
+		albumID, albumName := al.getAlbumInfo(arr.([]interface{}))
+		albums = append(albums, &Album{
+			ID:   albumID,
+			Name: albumName,
+		})
+	}
+	return albums, nil
+}
+
+func (al *AlbumlResponse) getMainArray() []interface{} {
+	var b []interface{}
+	json.Unmarshal([]byte(al.s), &b)
+	b = b[0].([]interface{})
+	obj := b[2].(string)
+	json.Unmarshal([]byte(obj), &b)
+
+	b = b[0].([]interface{})
+	return b
+}
+
+func (al *AlbumlResponse) getAlbumInfo(b []interface{}) (string, string) {
+
+	for _, c := range b {
+		if reflect.ValueOf(c).Kind() == reflect.Map {
+			innerarray := c.(map[string]interface{})["72930366"].([]interface{})
+			return b[0].(string), innerarray[1].(string)
+		}
+	}
+	return "", ""
 }

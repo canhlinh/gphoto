@@ -55,13 +55,13 @@ func SpritMagicToken(t string) []string {
 	return strings.Split(t, ":")
 }
 
-func JsonBodyByScanLine(s string) string {
+func JsonBodyByScanLine(s string, start, end int) string {
 	scanner := bufio.NewScanner(strings.NewReader(s))
 	i := 0
 	var b string
 	for scanner.Scan() {
 		i++
-		if i >= 4 && i <= 7 {
+		if i >= start && i <= end {
 			b += scanner.Text()
 		}
 	}

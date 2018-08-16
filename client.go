@@ -175,17 +175,20 @@ func (c *Client) Upload(filePath string, filename string, album string, progress
 	// Start create a new upload session
 	uploadURL, err := c.createUploadURL(filename, fileInfo.Size())
 	if err != nil {
+		log.Error("Failed to create upload url, got error %s", err.Error())
 		return nil, err
 	}
 
 	// start upload file
 	uploadToken, err := c.upload(uploadURL, file, fileInfo.Size(), progressHandler)
 	if err != nil {
+		log.Error("Failed to upload data, got error %s", err.Error())
 		return nil, err
 	}
 
 	photoID, photoURL, err := c.enableUploadedFile(uploadToken, filename, fileInfo.ModTime().UnixNano()/1000000)
 	if err != nil {
+		log.Error("Failed to enable upload url, got error %s", err.Error())
 		return nil, err
 	}
 
@@ -195,6 +198,7 @@ func (c *Client) Upload(filePath string, filename string, album string, progress
 
 	photo, err := c.moveToAlbum(album, photoID)
 	if err != nil {
+		log.Error("Failed to move the photo to album, got error %s", err.Error())
 		return nil, err
 	}
 
@@ -297,7 +301,7 @@ func (c *Client) enableUploadedFile(uploadBase64Token, fileName string, fileModA
 		return "", "", err
 	}
 
-	parsedBody := JsonBodyByScanLine(BodyToString(body))
+	parsedBody := JsonBodyByScanLine(BodyToString(body), 4, 7)
 	var enableImage EnableImageResponse
 	photoURL, err := enableImage.getEnabledImageURL(parsedBody)
 	if err != nil {
@@ -338,41 +342,17 @@ func (client *Client) DoQuery(endpoint string, query string) (io.ReadCloser, err
 
 func (client *Client) GetAlbums() (Albums, error) {
 	log.Info("Request to get albums")
+	query := fmt.Sprintf(`[[["Z5xsfc","[null,null,null,null,2,2]",null,"generic"]]]`)
 
-	body, err := client.DoQuery(GooglePhotoDataQueryURL, NewDataQuery(QueryNumberGetAlbum, []interface{}{nil, nil, nil, nil, 1}))
+	body, err := client.DoQuery(GoogleCommandDataURL, query)
 	if err != nil {
 		return nil, err
 	}
 	defer body.Close()
 
-	var r []interface{}
-	if err := json.Unmarshal(BodyToBytes(body)[6:], &r); err != nil {
-		return nil, err
-	}
-
-	var albums = Albums{}
-
-	r = r[0].([]interface{})
-	r = r[2].(map[string]interface{})[fmt.Sprintf("%v", QueryNumberGetAlbum)].([]interface{})
-
-	if len(r) == 0 {
-		return albums, nil
-	}
-
-	r = r[0].([]interface{})
-
-	for _, al := range r {
-		infos := al.([]interface{})
-		mdetails := infos[12].(map[string]interface{})
-		details := mdetails[fmt.Sprintf("%v", QueryNumberGetAlbum)].([]interface{})
-
-		albums = append(albums, &Album{
-			ID:   infos[0].(string),
-			Name: details[1].(string),
-		})
-	}
-
-	return albums, nil
+	jsonBody := JsonBodyByScanLine(BodyToString(body), 4, 5)
+	albumlResponse := NewAlbumlResponse(jsonBody)
+	return albumlResponse.Albums()
 }
 
 func (c *Client) SearchOrCreteaAlbum(name string, photoID string) (*Album, error) {
@@ -480,23 +460,26 @@ func (c *Client) RemoveFromAlbum(photoID string) error {
 	return nil
 }
 
-func (c *Client) moveToAlbum(name string, photoID string) (*Photo, error) {
-	log.Info("Request to move the upload file to the Default Album")
+func (c *Client) moveToAlbum(albumName string, photoID string) (*Photo, error) {
+	log.Info("Request to move the upload file to the album %s", albumName)
 
 	albums, err := c.GetAlbums()
 	if err != nil {
+		log.Error("Failed to get album %s", err.Error())
 		return nil, err
 	}
 
-	album := albums.Get(name)
+	album := albums.Get(albumName)
 	photo := Photo{ID: photoID}
 
 	if album == nil {
-		album, err = c.CreateAlbum(name, photoID)
+		album, err = c.CreateAlbum(albumName, photoID)
 		if err != nil {
+			log.Error("Failed to create new album %s", err.Error())
 			return nil, err
 		}
 	} else if err := c.AddPhotoToAlbum(album.ID, photoID); err != nil {
+		log.Error("Failed to add photo to existing album %s", err.Error())
 		return nil, err
 	}
 

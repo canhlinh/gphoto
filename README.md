@@ -1,6 +1,8 @@
 # gphoto
 A small lib to upload files to the google photo
 
+[![GoDoc](https://godoc.org/github.com/canhlinh/gphoto?status.svg)](http://godoc.org/github.com/canhlinh/gphoto)
+
 #### Features
 - Uploads file to google photo account via user's cookies, via user's credential (user, pass).
 - Update upload's progress while a file is uploading.

@@ -1,6 +1,7 @@
 # GPHOTO
 A small lib to upload files to the google photo
 
+[![Build Status](https://circleci.com/gh/canhlinh/gphoto.svg?style=svg)](https://circleci.com/gh/canhlinh/gphoto)
 [![GoDoc](https://godoc.org/github.com/canhlinh/gphoto?status.svg)](http://godoc.org/github.com/canhlinh/gphoto)
 
 # Features

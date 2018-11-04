@@ -1,6 +1,7 @@
 package gphoto
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -39,13 +41,18 @@ func GenNewSampleFile(orginalPath string) string {
 	return filePath
 }
 
-func GetTestCookies() []*http.Cookie {
-	file, err := os.Open(CookieJsonFile)
-	if err != nil {
-		panic(err)
+func getTestCookiesFromENV(t testing.TB) []*http.Cookie {
+	photoCookiesBase64 := os.Getenv("GPHOTO_COOKIES_BASE64")
+	if photoCookiesBase64 == "" {
+		t.Fatal("ENV GPHOTO_COOKIES_BASE64 can not be empty")
 	}
+	photoCookies, err := base64.URLEncoding.DecodeString(photoCookiesBase64)
+	require.NoError(t, err)
+
 	var cookies []*http.Cookie
-	json.NewDecoder(file).Decode(&cookies)
+	if err := json.Unmarshal([]byte(photoCookies), &cookies); err != nil {
+		t.Log(err)
+	}
 	return cookies
 }
 
@@ -54,7 +61,7 @@ func TestUpload(t *testing.T) {
 	sampleFile := GenNewSampleFile("./sample_data/sample.mp4")
 	defer os.Remove(sampleFile)
 
-	client := NewClient(GetTestCookies()...)
+	client := NewClient(getTestCookiesFromENV(t)...)
 
 	t.Run("UploadSuccessWithoutProgressHandler", func(t *testing.T) {
 		photo, err := client.Upload(sampleFile, "sample.mp4", "", nil)
@@ -112,7 +119,7 @@ func BenchmarkReUpload(b *testing.B) {
 		sampleFile := GenNewSampleFile("./sample_data/sample.mp4")
 		defer os.Remove(sampleFile)
 
-		client := NewClient(GetTestCookies()...)
+		client := NewClient(getTestCookiesFromENV(b)...)
 
 		if _, err := client.Upload(sampleFile, "", "", nil); err != nil {
 			b.Fatal(err)

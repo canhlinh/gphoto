@@ -1,0 +1,10 @@
+version: 2
+jobs:
+  build:
+    docker:
+      # specify the version
+      - image: circleci/golang:1.11
+    working_directory: ~/gphoto
+    steps:
+      - checkout
+      - run: go test -v -race

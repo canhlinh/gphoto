@@ -103,6 +103,7 @@ func (c *Client) SetHTTPClient(hClient *http.Client) *Client {
 	return c
 }
 
+// Login login to google photo with your authentication info.
 func (c *Client) Login(user, pass string) error {
 	log.Info("Request to login")
 
@@ -317,6 +318,7 @@ func (c *Client) enableUploadedFile(uploadBase64Token, fileName string, fileModA
 	return photoID, photoURL, nil
 }
 
+// DoQuery executes http request
 func (client *Client) DoQuery(endpoint string, query string) (io.ReadCloser, error) {
 	if err := client.parseAtToken(); err != nil {
 		return nil, err
@@ -340,6 +342,7 @@ func (client *Client) DoQuery(endpoint string, query string) (io.ReadCloser, err
 	return res.Body, nil
 }
 
+// GetAlbums gets all google photo albums
 func (client *Client) GetAlbums() (Albums, error) {
 	log.Info("Request to get albums")
 	query := fmt.Sprintf(`[[["Z5xsfc","[null,null,null,null,2,2]",null,"generic"]]]`)
@@ -355,6 +358,7 @@ func (client *Client) GetAlbums() (Albums, error) {
 	return albumlResponse.Albums()
 }
 
+// SearchOrCreteaAlbum creates an album if the album name doesn't exist
 func (c *Client) SearchOrCreteaAlbum(name string, photoID string) (*Album, error) {
 	albums, err := c.GetAlbums()
 	if err != nil {
@@ -370,6 +374,7 @@ func (c *Client) SearchOrCreteaAlbum(name string, photoID string) (*Album, error
 	return c.CreateAlbum(name, photoID)
 }
 
+// CreateAlbum creates a new album
 func (c *Client) CreateAlbum(albumName string, photoID string) (*Album, error) {
 	log.Info("Request to create new album %v with photo's id %s \n", albumName, photoID)
 
@@ -399,8 +404,9 @@ func (c *Client) CreateAlbum(albumName string, photoID string) (*Album, error) {
 	return &album, nil
 }
 
-func (client *Client) GetSharedAlbumKey(albumID string) string {
-	res, _ := client.hClient.Get(fmt.Sprintf("https://photos.google.com/u/0/album/%s", albumID))
+// GetSharedAlbumKey gets an album's share key
+func (c *Client) GetSharedAlbumKey(albumID string) string {
+	res, _ := c.hClient.Get(fmt.Sprintf("https://photos.google.com/u/0/album/%s", albumID))
 	if res.StatusCode != 200 {
 		return ""
 	}
@@ -420,6 +426,7 @@ func (client *Client) GetSharedAlbumKey(albumID string) string {
 	return sharedKey
 }
 
+// AddPhotoToAlbum adds a photo to an album
 func (c *Client) AddPhotoToAlbum(albumID, photoID string) error {
 	log.Info("Request to add photo %s to album %s", photoID, albumID)
 	sharedAlbumKey := c.GetSharedAlbumKey(albumID)
@@ -441,6 +448,7 @@ func (c *Client) AddPhotoToAlbum(albumID, photoID string) error {
 	return nil
 }
 
+// RemoveFromAlbum Remove a photo from an album
 func (c *Client) RemoveFromAlbum(photoID string) error {
 	log.Info("Request to remove photo %s from the relevant album", photoID)
 
@@ -460,6 +468,7 @@ func (c *Client) RemoveFromAlbum(photoID string) error {
 	return nil
 }
 
+// moveToAlbum move a photo to an album
 func (c *Client) moveToAlbum(albumName string, photoID string) (*Photo, error) {
 	log.Info("Request to move the upload file to the album %s", albumName)
 

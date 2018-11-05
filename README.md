@@ -20,7 +20,7 @@ You can take a look at the test code to get some example.
 
 ## Install
 ```
-go get -u github.com/jinzhu/gorm
+go get -u github.com/canhlinh/gphoto
 ```
 
 ## Quick Start

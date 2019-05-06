@@ -10,7 +10,7 @@ A small lib to upload files to the google photo
 
 # Getting Started
 
-If you want to login to google automaticaly, you have to install ChromeDriver first.
+If you want to login to google automaticaly, you have to install ChromeDriver firstly.
 See more about ChromeDrive at https://sites.google.com/a/chromium.org/chromedriver/
 
 I'm not ensure the code can work smoothy. Use at your own risk.

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	log "github.com/canhlinh/log4go"
 )
 
 const (
@@ -222,6 +224,7 @@ func (al *AlbumlResponse) Albums() (albums []*Album, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("%v", r)
+			log.Error(err)
 		}
 	}()
 

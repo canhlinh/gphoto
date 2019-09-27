@@ -243,6 +243,11 @@ func (c *Client) parseAtToken() error {
 	return nil
 }
 
+func (c *Client) getRawMatigToken() string {
+	arr := strings.Split(c.magicToken, ":")
+	return arr[0]
+}
+
 //createUploadURL create an new upload url
 func (c *Client) createUploadURL(fileName string, fileSize int64) (string, error) {
 	log.Info("Request to create a new upload url")
@@ -345,7 +350,7 @@ func (client *Client) DoQuery(endpoint string, query string) (io.ReadCloser, err
 // GetAlbums gets all google photo albums
 func (client *Client) GetAlbums() (Albums, error) {
 	log.Info("Request to get albums")
-	query := fmt.Sprintf(`[[["Z5xsfc","[null,null,null,null,2,2]",null,"generic"]]]`)
+	query := fmt.Sprintf(`[[["kbqDO","[]",null,"1"],["kbqDO","[[null,null,[null,[null,null,[null,true]]]]]",null,"2"],["Z5xsfc","[null,null,null,null,1]",null,"3"]]]`)
 
 	body, err := client.DoQuery(GoogleCommandDataURL, query)
 	if err != nil {
@@ -353,16 +358,26 @@ func (client *Client) GetAlbums() (Albums, error) {
 	}
 	defer body.Close()
 
-	jsonBody := JsonBodyByScanLine(BodyToString(body), 4, 5)
+	stringBody := BodyToString(body)
+	jsonBody := JsonBodyByScanLine(stringBody, 7, 8)
 	albumlResponse := NewAlbumlResponse(jsonBody)
-	return albumlResponse.Albums()
+
+	albums, err := albumlResponse.Albums()
+	if err != nil {
+		return nil, err
+	}
+	return albums, nil
 }
 
 // SearchOrCreteaAlbum creates an album if the album name doesn't exist
-func (c *Client) SearchOrCreteaAlbum(name string, photoID string) (*Album, error) {
+func (c *Client) SearchOrCreteaAlbum(name string) (*Album, error) {
 	albums, err := c.GetAlbums()
 	if err != nil {
 		return nil, err
+	}
+
+	if len(albums) == 0 {
+		return nil, errors.New("No album is found")
 	}
 
 	for _, album := range albums {
@@ -371,37 +386,46 @@ func (c *Client) SearchOrCreteaAlbum(name string, photoID string) (*Album, error
 		}
 	}
 
-	return c.CreateAlbum(name, photoID)
+	return c.CreateAlbum(name)
 }
 
 // CreateAlbum creates a new album
-func (c *Client) CreateAlbum(albumName string, photoID string) (*Album, error) {
-	log.Info("Request to create new album %v with photo's id %s \n", albumName, photoID)
+func (c *Client) CreateAlbum(albumName string) (*Album, error) {
+	log.Info("Request to create new album %v with photo's id %s \n", albumName)
 
-	query := NewMutateQuery(QueryNumberCreateAlbum, []interface{}{
-		[]string{photoID},
-		nil,
-		albumName,
-	})
+	query := fmt.Sprintf(`[[["OXvT9d","[\"%s\",null,2,[]]",null,"generic"]]]`, albumName)
+	endpoint := GoogleCommandDataURL + "&rpcids=OXvT9d"
 
-	body, err := c.DoQuery(GooglePhotoMutateQueryURL, query)
+	body, err := c.DoQuery(endpoint, query)
 	if err != nil {
 		return nil, err
 	}
 	defer body.Close()
 
-	var album Album
-	var r interface{}
-	if err := json.Unmarshal(BodyToBytes(body)[6:], &r); err != nil {
+	stringBody := BodyToString(body)
+	jsonBody := JsonBodyByScanLine(stringBody, 4, 7)
+
+	var arr []interface{}
+	if err := json.Unmarshal([]byte(jsonBody), &arr); err != nil {
 		return nil, err
 	}
 
-	r = (r.([]interface{})[0]).([]interface{})[1]
-	r = r.(map[string]interface{})[fmt.Sprintf("%d", QueryNumberCreateAlbum)]
-	album.ID = r.([]interface{})[0].(string)
-	album.Name = albumName
+	arr = arr[0].([]interface{})
+	s := arr[2].(string)
+	var o interface{}
+	if err := json.Unmarshal([]byte(s), &o); err != nil {
+		return nil, err
+	}
+	arr = o.([]interface{})
+	arr = arr[0].([]interface{})
+	s = arr[0].(string)
 
-	return &album, nil
+	album := &Album{
+		ID:   s,
+		Name: albumName,
+	}
+
+	return album, nil
 }
 
 // GetSharedAlbumKey gets an album's share key
@@ -482,12 +506,14 @@ func (c *Client) moveToAlbum(albumName string, photoID string) (*Photo, error) {
 	photo := Photo{ID: photoID}
 
 	if album == nil {
-		album, err = c.CreateAlbum(albumName, photoID)
+		album, err = c.CreateAlbum(albumName)
 		if err != nil {
 			log.Error("Failed to create new album %s", err.Error())
 			return nil, err
 		}
-	} else if err := c.AddPhotoToAlbum(album.ID, photoID); err != nil {
+	}
+
+	if err := c.AddPhotoToAlbum(album.ID, photoID); err != nil {
 		log.Error("Failed to add photo to existing album %s", err.Error())
 		return nil, err
 	}

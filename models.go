@@ -229,6 +229,9 @@ func (al *AlbumlResponse) Albums() (albums []*Album, err error) {
 	}()
 
 	mainArray := al.getMainArray()
+
+	log.Warn(NewJSONString(mainArray))
+
 	for _, arr := range mainArray {
 		albumID, albumName := al.getAlbumInfo(arr.([]interface{}))
 		albums = append(albums, &Album{

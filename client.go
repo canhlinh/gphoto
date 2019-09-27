@@ -350,7 +350,7 @@ func (client *Client) DoQuery(endpoint string, query string) (io.ReadCloser, err
 // GetAlbums gets all google photo albums
 func (client *Client) GetAlbums() (Albums, error) {
 	log.Info("Request to get albums")
-	query := fmt.Sprintf(`[[["kbqDO","[]",null,"1"],["kbqDO","[[null,null,[null,[null,null,[null,true]]]]]",null,"2"],["Z5xsfc","[null,null,null,null,1]",null,"3"]]]`)
+	query := fmt.Sprintf(`[[["Z5xsfc","[null,null,null,null,1]",null,"3"]]]`)
 
 	body, err := client.DoQuery(GoogleCommandDataURL, query)
 	if err != nil {
@@ -359,13 +359,15 @@ func (client *Client) GetAlbums() (Albums, error) {
 	defer body.Close()
 
 	stringBody := BodyToString(body)
-	jsonBody := JsonBodyByScanLine(stringBody, 7, 8)
+	jsonBody := JsonBodyByScanLine(stringBody, 4, 5)
+
 	albumlResponse := NewAlbumlResponse(jsonBody)
 
 	albums, err := albumlResponse.Albums()
 	if err != nil {
 		return nil, err
 	}
+
 	return albums, nil
 }
 
@@ -391,7 +393,7 @@ func (c *Client) SearchOrCreteaAlbum(name string) (*Album, error) {
 
 // CreateAlbum creates a new album
 func (c *Client) CreateAlbum(albumName string) (*Album, error) {
-	log.Info("Request to create new album %v with photo's id %s \n", albumName)
+	log.Info("Request to create new album %s", albumName)
 
 	query := fmt.Sprintf(`[[["OXvT9d","[\"%s\",null,2,[]]",null,"generic"]]]`, albumName)
 	endpoint := GoogleCommandDataURL + "&rpcids=OXvT9d"

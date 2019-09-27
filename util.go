@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httputil"
+	"os"
 	"strings"
 	"time"
 )
@@ -57,13 +58,26 @@ func SpritMagicToken(t string) []string {
 
 func JsonBodyByScanLine(s string, start, end int) string {
 	scanner := bufio.NewScanner(strings.NewReader(s))
-	i := 0
+	i := 1
 	var b string
 	for scanner.Scan() {
-		i++
+
+		text := scanner.Text()
+
 		if i >= start && i <= end {
-			b += scanner.Text()
+			b += text
 		}
+
+		i++
 	}
 	return b
+}
+
+func WriteStringToFile(s string) {
+	file, err := os.Create("file.txt")
+	if err != nil {
+		panic(err)
+	}
+
+	io.Copy(file, strings.NewReader(s))
 }

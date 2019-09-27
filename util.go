@@ -63,9 +63,17 @@ func JsonBodyByScanLine(s string, start, end int) string {
 	for scanner.Scan() {
 
 		text := scanner.Text()
+		text = strings.TrimSpace(text)
 
-		if i >= start && i <= end {
+		if i >= start {
 			b += text
+			if end == -1 && text == "]" {
+				break
+			}
+
+			if i == end {
+				break
+			}
 		}
 
 		i++

@@ -359,8 +359,7 @@ func (client *Client) GetAlbums() (Albums, error) {
 	defer body.Close()
 
 	stringBody := BodyToString(body)
-	jsonBody := JsonBodyByScanLine(stringBody, 4, 5)
-
+	jsonBody := JsonBodyByScanLine(stringBody, 4, -1)
 	albumlResponse := NewAlbumlResponse(jsonBody)
 
 	albums, err := albumlResponse.Albums()

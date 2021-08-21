@@ -11,7 +11,7 @@ import (
 
 func main() {
 
-	cookies := GetCookiesFromJSON("./json.")
+	cookies := GetCookiesFromJSON("./cookie.json")
 	client := gphoto.NewClient(cookies...)
 
 	photo, err := client.Upload("../sample_data/sample.mp4", "sample.mp4", "AnyAlbumName", progressHandler)
@@ -35,5 +35,5 @@ func GetCookiesFromJSON(path string) []*http.Cookie {
 }
 
 func progressHandler(current int64, total int64) {
-	fmt.Printf("current %d , total %d ", current, total)
+	// fmt.Printf("current %d , total %d ", current, total)
 }

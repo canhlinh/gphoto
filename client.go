@@ -10,6 +10,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -46,6 +47,10 @@ const (
 
 var (
 	HomePageURL, _ = url.Parse(GooglePhotoURL)
+	regex1         = regexp.MustCompile(`"SNlM0e":"[a-zA-Z0-9_-]+:\d+"`)
+	regex2         = regexp.MustCompile(`\n\[\["wrb.fr","mdpdU","(.*?)"\]\]\n`)
+	regex3         = regexp.MustCompile(`\n\[\["wrb.fr","Z5xsfc",(.*?)\]\]\n`)
+	regex4         = regexp.MustCompile(`\n\[\["wrb.fr","OXvT9d",(.*?)\]\]\n`)
 )
 
 // Client present a upload client
@@ -144,7 +149,7 @@ func (c *Client) Login(user, pass string) error {
 	cookies, _ := page.GetCookies()
 	c.hClient.Jar.SetCookies(HomePageURL, cookies)
 
-	if err := c.parseAtToken(); err != nil {
+	if err := c.parseMagicToken(); err != nil {
 		return errors.New("Login failure. Can not get the magic token")
 	}
 
@@ -165,7 +170,7 @@ func (c *Client) Upload(filePath string, filename string, album string, progress
 	fileInfo, _ := file.Stat()
 
 	// A magic token need to be genarate firstly.
-	if err := c.parseAtToken(); err != nil {
+	if err := c.parseMagicToken(); err != nil {
 		return nil, err
 	}
 
@@ -186,12 +191,14 @@ func (c *Client) Upload(filePath string, filename string, album string, progress
 		log.Error("Failed to upload data, got error %s", err.Error())
 		return nil, err
 	}
+	fmt.Println("uploadToken:", uploadToken)
 
 	photoID, photoURL, err := c.enableUploadedFile(uploadToken, filename, fileInfo.ModTime().UnixNano()/1000000)
 	if err != nil {
 		log.Error("Failed to enable upload url, got error %s", err.Error())
 		return nil, err
 	}
+	fmt.Println("photoID:", photoID)
 
 	if album == "" {
 		album = DefaultAlbum
@@ -208,8 +215,8 @@ func (c *Client) Upload(filePath string, filename string, album string, progress
 	return photo, nil
 }
 
-//parseAtToken get the at token ( a magic token ) then set it as the magicToken
-func (c *Client) parseAtToken() error {
+//parseMagicToken get the at token ( a magic token ) then set it as the magicToken
+func (c *Client) parseMagicToken() error {
 	log.Info("Request to get the magic token")
 
 	res, err := c.hClient.Get(GooglePhotoURL)
@@ -222,30 +229,15 @@ func (c *Client) parseAtToken() error {
 	}
 
 	doc, _ := goquery.NewDocumentFromReader(res.Body)
-
-	var magicToken MagicToken
-	doc.Find("script").Each(func(i int, s *goquery.Selection) {
-		if strings.HasPrefix(s.Text(), "window.WIZ_global_data") {
-			script := s.Text()
-			scriptObject := script[strings.Index(script, "{"):]
-			scriptObject = scriptObject[:strings.LastIndex(scriptObject, "}")+1]
-
-			json.Unmarshal([]byte(scriptObject), &magicToken)
-			return
-		}
-	})
-
-	if magicToken.Token == "" {
+	s := doc.Text()
+	s = regex1.FindString(s)
+	if len(s) == 0 {
 		return errors.New("Failed to get the magic token")
 	}
-
-	c.magicToken = magicToken.Token
+	s = strings.TrimLeft(s, `"SNlM0e":`)
+	s = strings.Trim(s, `"`)
+	c.magicToken = s
 	return nil
-}
-
-func (c *Client) getRawMatigToken() string {
-	arr := strings.Split(c.magicToken, ":")
-	return arr[0]
 }
 
 //createUploadURL create an new upload url
@@ -306,15 +298,18 @@ func (c *Client) enableUploadedFile(uploadBase64Token, fileName string, fileModA
 		log.Error(err)
 		return "", "", err
 	}
+	defer body.Close()
 
-	parsedBody := JsonBodyByScanLine(BodyToString(body), 4, 7)
+	s := BodyToString(body)
+	s = regex2.FindString(s)
+	log.Debug(s)
 	var enableImage EnableImageResponse
-	photoURL, err := enableImage.getEnabledImageURL(parsedBody)
+	photoURL, err := enableImage.getEnabledImageURL(s)
 	if err != nil {
 		log.Error(err)
 		return "", "", err
 	}
-	photoID, err := enableImage.getEnabledImageID(parsedBody)
+	photoID, err := enableImage.getEnabledImageID(s)
 	if err != nil {
 		log.Error(err)
 		return "", "", err
@@ -325,9 +320,10 @@ func (c *Client) enableUploadedFile(uploadBase64Token, fileName string, fileModA
 
 // DoQuery executes http request
 func (client *Client) DoQuery(endpoint string, query string) (io.ReadCloser, error) {
-	if err := client.parseAtToken(); err != nil {
-		return nil, err
+	if client.magicToken == "" {
+		return nil, errors.New("Empty magic token")
 	}
+
 	form := url.Values{}
 	form.Add("at", client.magicToken)
 	form.Add("f.req", query)
@@ -350,18 +346,17 @@ func (client *Client) DoQuery(endpoint string, query string) (io.ReadCloser, err
 // GetAlbums gets all google photo albums
 func (client *Client) GetAlbums() (Albums, error) {
 	log.Info("Request to get albums")
-	query := fmt.Sprintf(`[[["Z5xsfc","[null,null,null,null,1]",null,"3"]]]`)
-
-	body, err := client.DoQuery(GoogleCommandDataURL, query)
+	body, err := client.DoQuery(GoogleCommandDataURL, `[[["Z5xsfc","[null,null,null,null,1]",null,"3"]]]`)
 	if err != nil {
 		return nil, err
 	}
 	defer body.Close()
 
-	stringBody := BodyToString(body)
-	jsonBody := JsonBodyByScanLine(stringBody, 4, -1)
-	albumlResponse := NewAlbumlResponse(jsonBody)
+	s := BodyToString(body)
+	s = regex3.FindString(s)
+	log.Debug(s)
 
+	albumlResponse := NewAlbumlResponse(s)
 	albums, err := albumlResponse.Albums()
 	if err != nil {
 		return nil, err
@@ -403,26 +398,26 @@ func (c *Client) CreateAlbum(albumName string) (*Album, error) {
 	}
 	defer body.Close()
 
-	stringBody := BodyToString(body)
-	jsonBody := JsonBodyByScanLine(stringBody, 4, 7)
+	s := BodyToString(body)
+	s = regex4.FindString(s)
 
 	var arr []interface{}
-	if err := json.Unmarshal([]byte(jsonBody), &arr); err != nil {
+	if err := json.Unmarshal([]byte(s), &arr); err != nil {
 		return nil, err
 	}
 
 	arr = arr[0].([]interface{})
-	s := arr[2].(string)
+	id := arr[2].(string)
 	var o interface{}
 	if err := json.Unmarshal([]byte(s), &o); err != nil {
 		return nil, err
 	}
 	arr = o.([]interface{})
 	arr = arr[0].([]interface{})
-	s = arr[0].(string)
+	id = arr[0].(string)
 
 	album := &Album{
-		ID:   s,
+		ID:   id,
 		Name: albumName,
 	}
 
@@ -519,6 +514,7 @@ func (c *Client) moveToAlbum(albumName string, photoID string) (*Photo, error) {
 		return nil, err
 	}
 
+	log.Debug("Added phonto:%d to album:%s", photoID, album.ID)
 	photo.AlbumID = album.ID
 	return &photo, nil
 }

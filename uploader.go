@@ -68,13 +68,16 @@ func (u *Uploader) do(url string, file io.Reader, fileSize int64) chan *UploadRe
 		req.ContentLength = fileSize
 		req.Header.Add("content-type", "application/octet-stream")
 		req.Header.Add("user-agent", ChromeUserAgent)
+		req.Header.Add("x-goog-upload-command", "upload, finalize")
+		req.Header.Add("x-goog-upload-offset", "0")
+		req.Header.Add("referer", "https://photos.google.com/")
+		req.Header.Add("origin", "https://photos.google.com")
 
 		res, err := u.hClient.Do(req)
 		if err != nil {
 			result.Err = err
 			return
 		}
-
 		result.Resp = res
 
 	}()

@@ -246,6 +246,9 @@ func (al *AlbumlResponse) getMainArray() []interface{} {
 	b = b[0].([]interface{})
 	obj := b[2].(string)
 	json.Unmarshal([]byte(obj), &b)
+	if b[0] == nil {
+		return []interface{}{}
+	}
 
 	b = b[0].([]interface{})
 	return b

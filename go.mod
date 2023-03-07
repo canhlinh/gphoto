@@ -13,7 +13,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/sclevine/agouti v3.0.0+incompatible
 	github.com/stretchr/testify v1.2.2
-	golang.org/x/net v0.0.0-20181102091132-c10e9556a7bc
+	golang.org/x/net v0.7.0
 )
 
 go 1.13
